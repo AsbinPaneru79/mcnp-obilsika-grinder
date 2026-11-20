@@ -13,10 +13,9 @@ Built with [Mineflayer](https://github.com/PrismarineJS/mineflayer), Express, an
 3. **Hotbar Selection:** Moves to the **2nd hotbar slot** (quickbar index 1).
 4. **Right Click:** Right-clicks (activates) the held navigation item to pop open the Game Modes GUI.
 5. **GUI Selection:** Identifies and clicks the **Blue Diamond Pickaxe** (Slot 11) in the 27-slot chest menu to transfer directly to the **Survival** realm.
-6. **Sit & AFK:** Once transferred to Survival:
-   - Sends `/sit` in chat to sit down.
-   - Sends `/afk` in chat to toggle AFK status.
-7. **Anti-AFK Keepalive:** Periodically executes subtle arm swings and yaw adjustments while sitting to prevent server inactivity / idle kicks.
+6. **AFK Mode:** Once transferred to Survival:
+   - Sends `/afk` in chat to toggle native AFK status (`ʏᴏᴜ ᴀʀᴇ ɴᴏᴡ ᴀꜰᴋ`).
+7. **Safe Playtime Grinding:** Keeps the bot safely active in the server without artificial movements or sitting conflicts.
 8. **Auto-Reconnect:** If kicked, disconnected, or faced with network drops, automatically rejoins after 8 seconds and repeats the full sequence seamlessly.
 
 ---

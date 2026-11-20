@@ -50,11 +50,11 @@ class BotManager {
       guiTargetMode: 'name_or_slot',
       guiTargetItem: 'diamond_pickaxe',
       guiTargetSlot: 11,
-      postCommands: ['/sit', '/afk'],
-      postCommandsDelayMs: 5000,
+      postCommands: ['/afk'],
+      postCommandsDelayMs: 4000,
       autoReconnect: true,
       reconnectDelayMs: 8000,
-      antiAfk: true,
+      antiAfk: false,
       antiAfkIntervalMs: 30000
     };
   }
@@ -414,8 +414,8 @@ class BotManager {
     this.log('system', 'Bot entered Survival server! Preparing commands...');
     this.updateState('in_survival', 'Survival Mode Active');
 
-    const commands = Array.isArray(this.config.postCommands) ? this.config.postCommands : ['/sit', '/afk'];
-    let delay = 1500;
+    const commands = Array.isArray(this.config.postCommands) ? this.config.postCommands : ['/afk'];
+    let delay = 2500;
 
     commands.forEach((cmd, idx) => {
       setTimeout(() => {
@@ -424,17 +424,10 @@ class BotManager {
         if (cleanCmd) {
           this.log('command', `Sending: ${cleanCmd}`);
           this.bot.chat(cleanCmd);
-
-          if (cleanCmd === '/sit') {
-            // Freeze physics simulation while seated to prevent LPX Malicious Location Spoof
-            if (this.bot.physics) {
-              this.bot.physicsEnabled = false;
-            }
-          }
         }
 
         if (idx === commands.length - 1) {
-          this.log('system', 'Completed post-join commands (/sit and /afk). Bot is safely grinding playtime 24/7 without anticheat issues.');
+          this.log('system', 'Completed post-join command (/afk). Bot is safely grinding playtime 24/7.');
         }
       }, delay);
       delay += 2000;

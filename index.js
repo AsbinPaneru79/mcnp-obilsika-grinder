@@ -8,13 +8,12 @@
  * 3. Switch to 2nd hotbar slot (slot index 1)
  * 4. Right-click held item to open Game Modes GUI
  * 5. Locate and click the blue Diamond Pickaxe (Slot 11) to transfer to Survival
- * 6. Send /sit in chat to sit down
- * 7. Send /afk in chat
- * 8. Auto-reconnect indefinitely upon kick/disconnect/error
+ * 6. Send /afk in chat to toggle AFK mode
+ * 7. Auto-reconnect indefinitely upon kick/disconnect/error
  *
  * Anti-Cheat Protection:
- * - Avoids sending artificial look/position packets while sitting (prevents [LPX] Malicious Location Spoof)
- * - Relies on server-native /sit and /afk for safe, permanent 24/7 playtime grinding
+ * - Removed /sit to avoid sitting vehicle position locks and anticheat conflicts
+ * - Relies on server-native /afk for safe, permanent 24/7 playtime grinding
  */
 
 try { require('dotenv').config(); } catch (e) {}
@@ -33,7 +32,7 @@ const CONFIG = {
   guiTargetItem: (process.env.GUI_TARGET_ITEM || 'diamond_pickaxe').toLowerCase(),
   guiTargetSlot: process.env.GUI_TARGET_SLOT !== undefined ? parseInt(process.env.GUI_TARGET_SLOT, 10) : 11,
 
-  postCommands: ['/sit', '/afk'],
+  postCommands: ['/afk'],
   postCommandsDelayMs: 4000,
 
   autoReconnect: process.env.AUTO_RECONNECT !== 'false',
@@ -350,28 +349,16 @@ function scheduleSurvivalCommands() {
   clearAllTimers();
 
   console.log('\n======================================================');
-  console.log('[Bot] Arrived in Survival server! Scheduling /sit and /afk...');
+  console.log('[Bot] Arrived in Survival server! Scheduling /afk command...');
   console.log('======================================================');
 
   // Allow 3 seconds for world chunks and player position to fully settle
   setTimeout(() => {
     if (!bot) return;
 
-    console.log('[Bot] Sending: /sit');
-    bot.chat('/sit');
-
-    // Freeze physics once seated so Mineflayer does NOT send conflicting position packets
-    // This completely prevents LPX anticheat from flagging "Malicious Location Spoof"
-    if (bot.physics) {
-      bot.physicsEnabled = false;
-    }
-
-    setTimeout(() => {
-      if (!bot) return;
-      console.log('[Bot] Sending: /afk');
-      bot.chat('/afk');
-      console.log('[Bot] Both /sit and /afk active! Bot is now safely grinding playtime 24/7 without anticheat interference.');
-    }, 1500);
+    console.log('[Bot] Sending: /afk');
+    bot.chat('/afk');
+    console.log('[Bot] /afk active! Bot is now safely grinding playtime 24/7.');
   }, 3000);
 }
 
