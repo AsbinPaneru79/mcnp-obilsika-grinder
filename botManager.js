@@ -1,3 +1,4 @@
+require('./patchPrismarineChat');
 const mineflayer = require('mineflayer');
 const fs = require('fs');
 const path = require('path');

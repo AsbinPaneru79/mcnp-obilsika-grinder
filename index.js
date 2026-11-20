@@ -16,6 +16,7 @@
  * - Relies on server-native /afk for safe, permanent 24/7 playtime grinding
  */
 
+require('./patchPrismarineChat');
 try { require('dotenv').config(); } catch (e) {}
 const http = require('http');
 const mineflayer = require('mineflayer');
