@@ -11,6 +11,10 @@
  * 6. Send /sit in chat to sit down
  * 7. Send /afk in chat
  * 8. Auto-reconnect indefinitely upon kick/disconnect/error
+ *
+ * Anti-Cheat Protection:
+ * - Avoids sending artificial look/position packets while sitting (prevents [LPX] Malicious Location Spoof)
+ * - Relies on server-native /sit and /afk for safe, permanent 24/7 playtime grinding
  */
 
 try { require('dotenv').config(); } catch (e) {}
@@ -30,13 +34,10 @@ const CONFIG = {
   guiTargetSlot: process.env.GUI_TARGET_SLOT !== undefined ? parseInt(process.env.GUI_TARGET_SLOT, 10) : 11,
 
   postCommands: ['/sit', '/afk'],
-  postCommandsDelayMs: 5000,
+  postCommandsDelayMs: 4000,
 
   autoReconnect: process.env.AUTO_RECONNECT !== 'false',
   reconnectDelayMs: parseInt(process.env.RECONNECT_DELAY_MS, 10) || 8000,
-
-  antiAfk: process.env.ANTI_AFK !== 'false',
-  antiAfkIntervalMs: 30000,
 
   webPort: parseInt(process.env.PORT, 10) || 3000
 };
@@ -45,7 +46,6 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let bot = null;
 let isReconnecting = false;
-let antiAfkTimer = null;
 let menuRetryInterval = null;
 let survivalTimer = null;
 
@@ -85,33 +85,7 @@ try {
   secondaryServer.on('error', () => {});
 } catch (e) {}
 
-// 2. Anti-AFK Routine in Survival
-function startAntiAfk() {
-  stopAntiAfk();
-  if (!CONFIG.antiAfk) return;
-
-  console.log(`[Anti-AFK] Keep-alive motion active (every ${CONFIG.antiAfkIntervalMs / 1000}s)...`);
-  antiAfkTimer = setInterval(() => {
-    if (!bot || !inSurvival) return;
-    try {
-      bot.swingArm('right');
-      if (bot.entity) {
-        const slightYaw = bot.entity.yaw + (Math.random() * 0.1 - 0.05);
-        bot.look(slightYaw, bot.entity.pitch, true);
-      }
-    } catch (e) {}
-  }, CONFIG.antiAfkIntervalMs);
-}
-
-function stopAntiAfk() {
-  if (antiAfkTimer) {
-    clearInterval(antiAfkTimer);
-    antiAfkTimer = null;
-  }
-}
-
 function clearAllTimers() {
-  stopAntiAfk();
   if (menuRetryInterval) {
     clearInterval(menuRetryInterval);
     menuRetryInterval = null;
@@ -122,7 +96,7 @@ function clearAllTimers() {
   }
 }
 
-// 3. Main Bot Factory
+// 2. Main Bot Factory
 function createBot() {
   if (bot) {
     bot.removeAllListeners();
@@ -192,12 +166,18 @@ function createBot() {
   bot.on('spawn', () => {
     console.log('[Bot] World spawn event detected.');
 
+    if (inSurvival) {
+      console.log('[Bot] Arrived in Survival world spawn.');
+      scheduleSurvivalCommands();
+      return;
+    }
+
     if (!hasLoggedIn) {
       executeLoginCommand();
     }
 
     if (!hasClickedGui) {
-      // We are in Lobby / Auth
+      // In Lobby / Auth
       setTimeout(() => {
         if (!hasClickedGui && bot) {
           startLobbyRoutine();
@@ -210,10 +190,10 @@ function createBot() {
   bot.on('respawn', () => {
     console.log('[Bot] Server transfer / respawn packet received.');
 
-    if (hasClickedGui && !inSurvival) {
+    if (hasClickedGui) {
       console.log('[Bot] Transferred to Survival server!');
       scheduleSurvivalCommands();
-    } else if (!hasClickedGui) {
+    } else {
       console.log('[Bot] Transferred to Lobby server. Starting menu selector routine...');
       setTimeout(() => {
         if (!hasClickedGui && bot) {
@@ -307,7 +287,7 @@ function createBot() {
   });
 }
 
-// 4. Helper Functions
+// 3. Helper Functions
 function executeLoginCommand() {
   if (!bot || hasLoggedIn) return;
   console.log(`[Auth] Sending: /login ${CONFIG.loginPassword}`);
@@ -331,20 +311,15 @@ function startLobbyRoutine() {
     }
 
     attempts++;
-    console.log(`[Lobby] [Attempt ${attempts}/8] Selecting 2nd hotbar slot (index ${quickBarIndex}) & right-clicking...`);
+    console.log(`[Lobby] [Attempt ${attempts}/8] Selecting 2nd hotbar slot (index ${quickBarIndex}) & activating item...`);
 
     try {
       bot.setQuickBarSlot(quickBarIndex);
 
-      if (bot.entity) {
-        bot.look(bot.entity.yaw, 0, true);
-      }
-
       setTimeout(() => {
         if (!bot || hasClickedGui) return;
         try {
-          bot.activateItem(); // Right click held item
-          bot.swingArm('right');
+          bot.activateItem(); // Right click held item cleanly without forcing look packets
         } catch (e) {
           console.warn(`[Lobby] Error activating item: ${e.message}`);
         }
@@ -378,21 +353,26 @@ function scheduleSurvivalCommands() {
   console.log('[Bot] Arrived in Survival server! Scheduling /sit and /afk...');
   console.log('======================================================');
 
-  let delayMs = 2000;
-  CONFIG.postCommands.forEach((cmd, idx) => {
+  // Allow 3 seconds for world chunks and player position to fully settle
+  setTimeout(() => {
+    if (!bot) return;
+
+    console.log('[Bot] Sending: /sit');
+    bot.chat('/sit');
+
+    // Freeze physics once seated so Mineflayer does NOT send conflicting position packets
+    // This completely prevents LPX anticheat from flagging "Malicious Location Spoof"
+    if (bot.physics) {
+      bot.physicsEnabled = false;
+    }
+
     setTimeout(() => {
       if (!bot) return;
-      const clean = cmd.trim();
-      console.log(`[Bot] Executing: ${clean}`);
-      bot.chat(clean);
-
-      if (idx === CONFIG.postCommands.length - 1) {
-        console.log('[Bot] Both /sit and /afk executed! Bot is now grinding playtime 24/7.');
-        startAntiAfk();
-      }
-    }, delayMs);
-    delayMs += 2000;
-  });
+      console.log('[Bot] Sending: /afk');
+      bot.chat('/afk');
+      console.log('[Bot] Both /sit and /afk active! Bot is now safely grinding playtime 24/7 without anticheat interference.');
+    }, 1500);
+  }, 3000);
 }
 
 function triggerReconnect() {

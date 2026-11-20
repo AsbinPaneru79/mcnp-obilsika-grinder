@@ -311,16 +311,10 @@ class BotManager {
         // Set hotbar slot (slot 2 = index 1)
         this.bot.setQuickBarSlot(quickBarIndex);
 
-        // Subtle look forward & activate item
-        if (this.bot.entity) {
-          this.bot.look(this.bot.entity.yaw, 0, true);
-        }
-
         setTimeout(() => {
           if (!this.bot || this.hasClickedGui) return;
           try {
-            this.bot.activateItem();
-            this.bot.swingArm('right');
+            this.bot.activateItem(); // Right click held item cleanly
           } catch (e) {
             this.log('warn', `Error activating item: ${e.message}`);
           }
@@ -430,13 +424,17 @@ class BotManager {
         if (cleanCmd) {
           this.log('command', `Sending: ${cleanCmd}`);
           this.bot.chat(cleanCmd);
+
+          if (cleanCmd === '/sit') {
+            // Freeze physics simulation while seated to prevent LPX Malicious Location Spoof
+            if (this.bot.physics) {
+              this.bot.physicsEnabled = false;
+            }
+          }
         }
 
         if (idx === commands.length - 1) {
-          this.log('system', 'Completed post-join commands (/sit and /afk). Bot is now AFK grinding!');
-          if (this.config.antiAfk) {
-            this.startAntiAfk();
-          }
+          this.log('system', 'Completed post-join commands (/sit and /afk). Bot is safely grinding playtime 24/7 without anticheat issues.');
         }
       }, delay);
       delay += 2000;
@@ -444,22 +442,8 @@ class BotManager {
   }
 
   startAntiAfk() {
+    // Disabled to avoid LPX Malicious Location Spoof while sitting
     this.stopAntiAfk();
-    const interval = Math.max(10000, parseInt(this.config.antiAfkIntervalMs, 10) || 30000);
-    this.log('system', `Anti-AFK keep-alive active (every ${interval / 1000}s).`);
-
-    this.antiAfkTimer = setInterval(() => {
-      if (!this.bot || !this.inSurvival) return;
-      try {
-        this.bot.swingArm('right');
-        if (this.bot.entity) {
-          const newYaw = this.bot.entity.yaw + (Math.random() * 0.1 - 0.05);
-          this.bot.look(newYaw, this.bot.entity.pitch, true);
-        }
-      } catch (e) {
-        // ignore subtle action errors
-      }
-    }, interval);
   }
 
   stopAntiAfk() {

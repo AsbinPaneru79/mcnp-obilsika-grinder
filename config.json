@@ -20,6 +20,6 @@
   "postCommandsDelayMs": 5000,
   "autoReconnect": true,
   "reconnectDelayMs": 8000,
-  "antiAfk": true,
+  "antiAfk": false,
   "antiAfkIntervalMs": 30000
 }
