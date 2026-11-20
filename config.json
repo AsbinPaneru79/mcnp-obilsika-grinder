@@ -1,0 +1,25 @@
+{
+  "host": "mcnp.network",
+  "port": 25565,
+  "username": "ObilSika_",
+  "auth": "offline",
+  "version": false,
+  "password": "tynorix",
+  "autoLogin": true,
+  "loginDelayMs": 2500,
+  "hotbarSlot": 2,
+  "useItemAfterSwitch": true,
+  "useItemDelayMs": 1500,
+  "guiTargetMode": "name_or_slot",
+  "guiTargetItem": "diamond_pickaxe",
+  "guiTargetSlot": 11,
+  "postCommands": [
+    "/sit",
+    "/afk"
+  ],
+  "postCommandsDelayMs": 5000,
+  "autoReconnect": true,
+  "reconnectDelayMs": 8000,
+  "antiAfk": true,
+  "antiAfkIntervalMs": 30000
+}

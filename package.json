@@ -1,0 +1,26 @@
+{
+  "name": "mcnp-obilsika-grinder",
+  "version": "1.0.0",
+  "description": "Automated Minecraft 24/7 AFK Grinder bot for ObilSika_ on mcnp.network with auto-login, hotbar GUI navigation, /sit, /afk, auto-reconnect and Web Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "bot": "node index.js"
+  },
+  "keywords": [
+    "mineflayer",
+    "minecraft",
+    "afk-bot",
+    "mcnp",
+    "obilsika",
+    "railway"
+  ],
+  "author": "AsbinPaneru79",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mineflayer": "^4.23.1",
+    "socket.io": "^4.8.1"
+  }
+}
