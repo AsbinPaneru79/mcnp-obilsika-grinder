@@ -25,7 +25,7 @@ const mineflayer = require('mineflayer');
 const CONFIG = {
   host: process.env.MC_HOST || 'mcnp.network',
   port: parseInt(process.env.MC_PORT, 10) || 25565,
-  username: process.env.MC_USERNAME || 'ObilSika_',
+  username: process.env.MC_USERNAME || '_ObilSika_',
   loginPassword: process.env.MC_PASSWORD || 'tynorix',
   version: process.env.MC_VERSION || false, // false auto-detects version
 
