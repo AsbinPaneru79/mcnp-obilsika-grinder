@@ -14,6 +14,8 @@ class BotManager {
     this.antiAfkTimer = null;
     this.menuRetryInterval = null;
     this.survivalTimer = null;
+    this.afkCheckInterval = null;
+    this.isAfk = false;
     this.state = 'offline';
     
     // Stage flags
@@ -103,6 +105,11 @@ class BotManager {
       clearTimeout(this.survivalTimer);
       this.survivalTimer = null;
     }
+    if (this.afkCheckInterval) {
+      clearInterval(this.afkCheckInterval);
+      this.afkCheckInterval = null;
+    }
+    this.isAfk = false;
     this.stopAntiAfk();
   }
 
@@ -184,24 +191,29 @@ class BotManager {
         this.executeLoginCommand();
       }
 
-      // If we haven't clicked GUI yet, start lobby routine
-      if (!this.hasClickedGui) {
-        setTimeout(() => {
-          if (!this.hasClickedGui && this.bot) {
-            this.startLobbyRoutine();
-          }
-        }, 2500);
+      // If we clicked GUI and arrive in Survival
+      if (this.hasClickedGui) {
+        this.log('system', 'World spawn in Survival detected! Triggering /afk routine...');
+        this.scheduleSurvivalCommands();
+        return;
       }
+
+      // If we haven't clicked GUI yet, start lobby routine
+      setTimeout(() => {
+        if (!this.hasClickedGui && this.bot) {
+          this.startLobbyRoutine();
+        }
+      }, 2500);
     });
 
     // Detect server transfer (e.g. Auth -> Lobby or Lobby -> Survival)
     bot.on('respawn', () => {
       this.log('minecraft', 'Server transfer / respawn packet received.');
 
-      if (this.hasClickedGui && !this.inSurvival) {
-        this.log('system', 'Server transfer to Survival detected!');
+      if (this.hasClickedGui) {
+        this.log('system', 'Server transfer to Survival detected! Triggering /afk routine...');
         this.scheduleSurvivalCommands();
-      } else if (!this.hasClickedGui) {
+      } else {
         this.log('system', 'Transferred to Lobby. Initializing server selector sequence...');
         setTimeout(() => {
           if (!this.hasClickedGui && this.bot) {
@@ -245,6 +257,29 @@ class BotManager {
             this.startLobbyRoutine();
           }
         }, 2500);
+      }
+
+      // Detect Survival join announcements to guarantee /afk is sent
+      if (this.hasClickedGui && !this.inSurvival) {
+        if (lower.includes('dailyquests') || lower.includes('vote for us') || lower.includes(this.config.username.toLowerCase())) {
+          this.log('system', 'Survival arrival confirmed via chat. Triggering /afk...');
+          this.scheduleSurvivalCommands();
+        }
+      }
+
+      // Detect AFK state confirmations and cancellations
+      if (lower.includes('now afk') || lower.includes('you are now afk')) {
+        this.isAfk = true;
+        this.log('system', 'AFK mode confirmed active: ' + plainText);
+        this.updateState('in_survival', 'AFK Active');
+      } else if (lower.includes('no longer afk') || lower.includes('not afk')) {
+        this.isAfk = false;
+        this.log('warn', 'Server indicates AFK cancelled. Re-sending /afk in 2s...');
+        setTimeout(() => {
+          if (this.bot && this.inSurvival) {
+            this.sendAfk();
+          }
+        }, 2000);
       }
     });
 
@@ -416,7 +451,7 @@ class BotManager {
   }
 
   scheduleSurvivalCommands() {
-    if (this.inSurvival || this.postCommandsSent) return;
+    if (this.inSurvival && this.postCommandsSent) return;
     this.inSurvival = true;
     this.postCommandsSent = true;
 
@@ -425,27 +460,38 @@ class BotManager {
       this.menuRetryInterval = null;
     }
 
-    this.log('system', 'Bot entered Survival server! Preparing commands...');
+    this.log('system', 'Bot entered Survival server! Preparing /afk command...');
     this.updateState('in_survival', 'Survival Mode Active');
 
-    const commands = Array.isArray(this.config.postCommands) ? this.config.postCommands : ['/afk'];
-    let delay = 2500;
+    // Wait 3.5 seconds for chunks and player entity to settle
+    setTimeout(() => {
+      if (!this.bot) return;
+      this.sendAfk();
 
-    commands.forEach((cmd, idx) => {
+      // Backup check: If not confirmed AFK after 5 seconds, send /afk again
       setTimeout(() => {
-        if (!this.bot) return;
-        const cleanCmd = cmd.trim();
-        if (cleanCmd) {
-          this.log('command', `Sending: ${cleanCmd}`);
-          this.bot.chat(cleanCmd);
+        if (this.bot && this.inSurvival && !this.isAfk) {
+          this.log('system', 'AFK not yet confirmed, re-sending /afk backup...');
+          this.sendAfk();
         }
+      }, 5000);
+    }, 3500);
 
-        if (idx === commands.length - 1) {
-          this.log('system', 'Completed post-join command (/afk). Bot is safely grinding playtime 24/7.');
-        }
-      }, delay);
-      delay += 2000;
-    });
+    // Periodic AFK maintenance: every 10 minutes, verify AFK status
+    if (this.afkCheckInterval) clearInterval(this.afkCheckInterval);
+    this.afkCheckInterval = setInterval(() => {
+      if (this.bot && this.inSurvival && !this.isAfk) {
+        this.log('system', 'Periodic check: Re-asserting /afk status...');
+        this.sendAfk();
+      }
+    }, 10 * 60 * 1000);
+  }
+
+  sendAfk() {
+    if (!this.bot) return { success: false, error: 'Bot is not connected' };
+    this.log('command', 'Sending: /afk');
+    this.bot.chat('/afk');
+    return { success: true, message: 'Sent /afk command' };
   }
 
   startAntiAfk() {
@@ -506,6 +552,7 @@ class BotManager {
   getStatus() {
     return {
       state: this.state,
+      isAfk: this.isAfk,
       isManualStop: this.isManualStop,
       botUsername: this.config.username,
       host: this.config.host,

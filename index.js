@@ -48,6 +48,8 @@ let bot = null;
 let isReconnecting = false;
 let menuRetryInterval = null;
 let survivalTimer = null;
+let afkCheckInterval = null;
+let isAfk = false;
 
 // State flags
 let hasLoggedIn = false;
@@ -94,6 +96,11 @@ function clearAllTimers() {
     clearTimeout(survivalTimer);
     survivalTimer = null;
   }
+  if (afkCheckInterval) {
+    clearInterval(afkCheckInterval);
+    afkCheckInterval = null;
+  }
+  isAfk = false;
 }
 
 // 2. Main Bot Factory
@@ -165,14 +172,34 @@ function createBot() {
         }
       }, 2000);
     }
+
+    // Detect Survival chat announcement to trigger /afk
+    if (hasClickedGui && !inSurvival) {
+      if (lower.includes('dailyquests') || lower.includes('vote for us') || lower.includes(CONFIG.username.toLowerCase())) {
+        console.log('[Bot] Survival arrival detected in chat! Triggering /afk routine...');
+        scheduleSurvivalCommands();
+      }
+    }
+
+    // Check for AFK status confirmations and cancellations
+    if (lower.includes('now afk') || lower.includes('you are now afk')) {
+      isAfk = true;
+      console.log('[AFK] Confirmed: Bot is NOW AFK on the server!');
+    } else if (lower.includes('no longer afk') || lower.includes('not afk')) {
+      isAfk = false;
+      console.log('[AFK] Server indicates AFK cancelled. Re-sending /afk in 2s...');
+      setTimeout(() => {
+        if (bot && inSurvival) sendAfk();
+      }, 2000);
+    }
   });
 
   // Spawn event (Triggers on Lobby join and Survival join)
   bot.on('spawn', () => {
     console.log('[Bot] World spawn event detected.');
 
-    if (inSurvival) {
-      console.log('[Bot] Arrived in Survival world spawn.');
+    if (hasClickedGui) {
+      console.log('[Bot] Arrived in Survival world spawn! Triggering /afk routine...');
       scheduleSurvivalCommands();
       return;
     }
@@ -354,8 +381,14 @@ function startLobbyRoutine() {
   menuRetryInterval = setInterval(attemptOpenMenu, 2500);
 }
 
+function sendAfk() {
+  if (!bot) return;
+  console.log('[Bot] Sending: /afk');
+  bot.chat('/afk');
+}
+
 function scheduleSurvivalCommands() {
-  if (inSurvival || postCommandsSent) return;
+  if (inSurvival && postCommandsSent) return;
   inSurvival = true;
   postCommandsSent = true;
 
@@ -365,14 +398,28 @@ function scheduleSurvivalCommands() {
   console.log('[Bot] Arrived in Survival server! Scheduling /afk command...');
   console.log('======================================================');
 
-  // Allow 3 seconds for world chunks and player position to fully settle
+  // Allow 3.5 seconds for world chunks and player position to fully settle
   setTimeout(() => {
     if (!bot) return;
+    sendAfk();
 
-    console.log('[Bot] Sending: /afk');
-    bot.chat('/afk');
-    console.log('[Bot] /afk active! Bot is now safely grinding playtime 24/7.');
-  }, 3000);
+    // Backup check after 5 seconds: if not confirmed AFK, send /afk again
+    setTimeout(() => {
+      if (bot && inSurvival && !isAfk) {
+        console.log('[Bot] AFK not confirmed yet, sending /afk backup...');
+        sendAfk();
+      }
+    }, 5000);
+  }, 3500);
+
+  // Periodic AFK guard: every 10 minutes, verify /afk
+  if (afkCheckInterval) clearInterval(afkCheckInterval);
+  afkCheckInterval = setInterval(() => {
+    if (bot && inSurvival && !isAfk) {
+      console.log('[Bot] Periodic check: Re-asserting /afk status...');
+      sendAfk();
+    }
+  }, 10 * 60 * 1000);
 }
 
 function triggerReconnect() {

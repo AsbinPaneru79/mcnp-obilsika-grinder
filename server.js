@@ -43,6 +43,11 @@ app.post('/api/rerun', (req, res) => {
   res.json(result);
 });
 
+app.post('/api/afk', (req, res) => {
+  const result = botManager.sendAfk();
+  res.json(result);
+});
+
 app.post('/api/chat', (req, res) => {
   const { message } = req.body;
   if (!message) {

@@ -80,6 +80,9 @@
         <button id="btn-resume" onclick="startBot()" class="px-4 py-2 bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white font-medium text-sm rounded-lg shadow-lg shadow-emerald-600/20 transition flex items-center gap-2">
           <i class="fa-solid fa-play"></i> Resume Bot
         </button>
+        <button id="btn-afk" onclick="triggerAfk()" title="Send /afk command to server" class="px-3 py-2 bg-indigo-600/90 hover:bg-indigo-500 active:scale-95 text-white font-medium text-sm rounded-lg shadow-lg shadow-indigo-600/20 transition flex items-center gap-2">
+          <i class="fa-solid fa-moon"></i> /afk
+        </button>
         <button id="btn-rerun" onclick="rerunRoutine()" title="Re-run login & survival entry sequence" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 active:scale-95 text-gray-300 font-medium text-sm rounded-lg transition flex items-center gap-2">
           <i class="fa-solid fa-rotate-right"></i>
         </button>
@@ -529,6 +532,16 @@
         showToast(data.message || 'Routine re-run initiated.', 'info');
       } catch (err) {
         showToast('Failed to trigger routine.', 'error');
+      }
+    }
+
+    async function triggerAfk() {
+      try {
+        const res = await fetch('/api/afk', { method: 'POST' });
+        const data = await res.json();
+        showToast(data.message || 'Sent /afk command.', 'info');
+      } catch (err) {
+        showToast('Failed to send /afk.', 'error');
       }
     }
 
