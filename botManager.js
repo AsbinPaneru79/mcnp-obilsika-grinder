@@ -39,7 +39,7 @@ class BotManager {
     return {
       host: 'mcnp.network',
       port: 25565,
-      username: 'ObilSika_',
+      username: '_ObilSika_',
       auth: 'offline',
       version: false,
       password: 'tynorix',
@@ -225,15 +225,20 @@ class BotManager {
 
       const lower = plainText.toLowerCase();
 
+      // Check for /register prompt
+      if ((lower.includes('/register') || lower.includes('please register') || lower.includes('type /register')) && !this.loginSent) {
+        this.log('system', 'Server requested /register. Executing...');
+        this.executeRegisterCommand();
+      }
       // Check for /login prompt
-      if ((lower.includes('/login') || lower.includes('please login') || lower.includes('type /login')) && !this.loginSent) {
+      else if ((lower.includes('/login') || lower.includes('please login') || lower.includes('type /login')) && !this.loginSent) {
         this.log('system', 'Server requested /login. Executing...');
         this.executeLoginCommand();
       }
 
-      // Check for login success
-      if (lower.includes('successful') || lower.includes('logged in') || lower.includes('welcome back') || lower.includes('auth')) {
-        this.log('system', 'Login acknowledged. Moving to Lobby...');
+      // Check for login / register success
+      if (lower.includes('successful') || lower.includes('logged in') || lower.includes('registered') || lower.includes('welcome back') || lower.includes('auth')) {
+        this.log('system', 'Auth acknowledged. Moving to Lobby...');
         this.inLobby = true;
         setTimeout(() => {
           if (!this.hasClickedGui && this.bot) {
@@ -275,6 +280,14 @@ class BotManager {
       this.log('error', `Bot error: ${err.message}`);
       this.updateState('error', err.message);
     });
+  }
+
+  executeRegisterCommand() {
+    if (!this.bot || this.loginSent) return;
+    const pwd = this.config.password || 'tynorix';
+    this.log('command', `Sending: /register ${pwd} ${pwd}`);
+    this.bot.chat(`/register ${pwd} ${pwd}`);
+    this.loginSent = true;
   }
 
   executeLoginCommand() {

@@ -145,15 +145,20 @@ function createBot() {
 
     const lower = raw.toLowerCase();
 
+    // Check for register prompt
+    if ((lower.includes('/register') || lower.includes('please register') || lower.includes('type /register')) && !hasLoggedIn) {
+      console.log(`[Auth] Register prompt detected in chat! Executing register...`);
+      executeRegisterCommand();
+    }
     // Check for login prompt
-    if ((lower.includes('/login') || lower.includes('please login') || lower.includes('type /login')) && !hasLoggedIn) {
+    else if ((lower.includes('/login') || lower.includes('please login') || lower.includes('type /login')) && !hasLoggedIn) {
       console.log(`[Auth] Login prompt detected in chat! Executing login...`);
       executeLoginCommand();
     }
 
-    // Check for login success
-    if (lower.includes('successful') || lower.includes('logged in') || lower.includes('welcome back')) {
-      console.log(`[Auth] Login confirmed! Proceeding to Lobby routine...`);
+    // Check for auth success
+    if (lower.includes('successful') || lower.includes('logged in') || lower.includes('registered') || lower.includes('welcome back')) {
+      console.log(`[Auth] Auth confirmed! Proceeding to Lobby routine...`);
       setTimeout(() => {
         if (!hasClickedGui && bot) {
           startLobbyRoutine();
@@ -288,6 +293,13 @@ function createBot() {
 }
 
 // 3. Helper Functions
+function executeRegisterCommand() {
+  if (!bot || hasLoggedIn) return;
+  console.log(`[Auth] Sending: /register ${CONFIG.loginPassword} ${CONFIG.loginPassword}`);
+  bot.chat(`/register ${CONFIG.loginPassword} ${CONFIG.loginPassword}`);
+  hasLoggedIn = true;
+}
+
 function executeLoginCommand() {
   if (!bot || hasLoggedIn) return;
   console.log(`[Auth] Sending: /login ${CONFIG.loginPassword}`);

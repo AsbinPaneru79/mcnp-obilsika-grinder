@@ -125,5 +125,5 @@ targetPorts.forEach((port) => {
 });
 
 // Automatically start bot on application launch
-console.log(`[AutoStart] Launching ObilSika_ bot on mcnp.network...`);
+console.log(`[AutoStart] Launching ${botManager.config.username} bot on mcnp.network...`);
 botManager.start();

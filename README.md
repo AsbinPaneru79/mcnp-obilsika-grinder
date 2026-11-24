@@ -1,15 +1,15 @@
 # MCNP ObilSika Grinder ⛏️
 
-An automated 24/7 Minecraft AFK bot tailored for player **`ObilSika_`** on the **`mcnp.network`** server.
+An automated 24/7 Minecraft AFK bot tailored for player **`_ObilSika_`** on the **`mcnp.network`** server.
 
-Built with [Mineflayer](https://github.com/PrismarineJS/mineflayer), Express, and Socket.IO, this bot automatically handles login authentication, hotbar selection, GUI navigation to Survival mode, sitting & AFK commands, continuous keep-alive, and auto-reconnection.
+Built with [Mineflayer](https://github.com/PrismarineJS/mineflayer), Express, and Socket.IO, this bot automatically handles registration/login authentication, hotbar selection, GUI navigation to Survival mode, AFK status, and auto-reconnection.
 
 ---
 
 ## ⚡ What It Does (Step-by-Step)
 
-1. **Joins Server:** Connects to `mcnp.network:25565` using offline auth with username **`ObilSika_`**.
-2. **Auto-Login:** Immediately runs `/login tynorix` upon detecting the login prompt (with automatic timer fallback).
+1. **Joins Server:** Connects to `mcnp.network:25565` using offline auth with username **`_ObilSika_`**.
+2. **Auto-Register & Auto-Login:** Automatically detects if the server requires `/register tynorix tynorix` or `/login tynorix` upon detecting the prompt (with automatic timer fallback).
 3. **Hotbar Selection:** Moves to the **2nd hotbar slot** (quickbar index 1).
 4. **Right Click:** Right-clicks (activates) the held navigation item to pop open the Game Modes GUI.
 5. **GUI Selection:** Identifies and clicks the **Blue Diamond Pickaxe** (Slot 11) in the 27-slot chest menu to transfer directly to the **Survival** realm.
