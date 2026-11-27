@@ -13,12 +13,12 @@
   "guiTargetMode": "name_or_slot",
   "guiTargetItem": "diamond_pickaxe",
   "guiTargetSlot": 11,
-  "postCommands": [
-    "/afk"
-  ],
+  "postCommands": [],
   "postCommandsDelayMs": 5000,
   "autoReconnect": true,
   "reconnectDelayMs": 8000,
+  "autoClicker": true,
+  "autoClickIntervalMs": 800,
   "antiAfk": false,
   "antiAfkIntervalMs": 30000
 }

@@ -251,9 +251,15 @@
             </label>
 
             <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" id="cfg-anti-afk" class="w-4 h-4 rounded text-emerald-500 bg-gray-950 border-gray-700 focus:ring-0">
-              <span class="text-xs text-gray-300">Anti-AFK keep alive (subtle swing arm & look around)</span>
+              <input type="checkbox" id="cfg-auto-clicker" class="w-4 h-4 rounded text-emerald-500 bg-gray-950 border-gray-700 focus:ring-0">
+              <span class="text-xs text-gray-300">Spam left-click in Survival (Grind mob farm & Anti-AFK)</span>
             </label>
+
+            <div class="flex items-center gap-2 pl-7">
+              <span class="text-xs text-gray-400">Click interval:</span>
+              <input type="number" id="cfg-click-interval" min="200" max="5000" step="50" class="w-24 px-2 py-1 bg-gray-950 border border-gray-700 rounded text-xs text-gray-200" value="800">
+              <span class="text-xs text-gray-500">ms</span>
+            </div>
           </div>
 
           <!-- Save Button -->
@@ -453,10 +459,11 @@
       document.getElementById('cfg-hotbar').value = cfg.hotbarSlot || 2;
       document.getElementById('cfg-target-slot').value = cfg.guiTargetSlot !== undefined ? cfg.guiTargetSlot : 11;
       document.getElementById('cfg-target-item').value = cfg.guiTargetItem || 'diamond_pickaxe';
-      document.getElementById('cfg-post-commands').value = Array.isArray(cfg.postCommands) ? cfg.postCommands.join('\n') : '/sit\n/afk';
+      document.getElementById('cfg-post-commands').value = Array.isArray(cfg.postCommands) ? cfg.postCommands.join('\n') : '';
       document.getElementById('cfg-use-item').checked = cfg.useItemAfterSwitch !== false;
       document.getElementById('cfg-reconnect').checked = cfg.autoReconnect !== false;
-      document.getElementById('cfg-anti-afk').checked = cfg.antiAfk !== false;
+      document.getElementById('cfg-auto-clicker').checked = cfg.autoClicker !== false;
+      document.getElementById('cfg-click-interval').value = cfg.autoClickIntervalMs || 800;
 
       const targetSlot = cfg.guiTargetSlot !== undefined ? parseInt(cfg.guiTargetSlot, 10) : 11;
       renderChestGui(targetSlot);
@@ -482,10 +489,11 @@
         hotbarSlot: parseInt(document.getElementById('cfg-hotbar').value, 10) || 2,
         guiTargetSlot: parseInt(document.getElementById('cfg-target-slot').value, 10),
         guiTargetItem: document.getElementById('cfg-target-item').value.trim(),
-        postCommands: postCommands.length > 0 ? postCommands : ['/sit', '/afk'],
+        postCommands: postCommands,
         useItemAfterSwitch: document.getElementById('cfg-use-item').checked,
         autoReconnect: document.getElementById('cfg-reconnect').checked,
-        antiAfk: document.getElementById('cfg-anti-afk').checked
+        autoClicker: document.getElementById('cfg-auto-clicker').checked,
+        autoClickIntervalMs: parseInt(document.getElementById('cfg-click-interval').value, 10) || 800
       };
 
       try {

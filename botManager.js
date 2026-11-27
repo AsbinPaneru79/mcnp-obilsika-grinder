@@ -30,6 +30,7 @@ class BotManager {
     this.menuRetryInterval = null;
     this.survivalTimer = null;
     this.afkCheckInterval = null;
+    this.autoClickTimer = null;
     this.isAfk = false;
     this.state = 'offline';
     
@@ -68,10 +69,12 @@ class BotManager {
       guiTargetMode: 'name_or_slot',
       guiTargetItem: 'diamond_pickaxe',
       guiTargetSlot: 11,
-      postCommands: ['/afk'],
+      postCommands: [],
       postCommandsDelayMs: 4000,
       autoReconnect: true,
       reconnectDelayMs: 8000,
+      autoClicker: true,
+      autoClickIntervalMs: 800,
       antiAfk: false,
       antiAfkIntervalMs: 30000
     };
@@ -125,6 +128,7 @@ class BotManager {
       this.afkCheckInterval = null;
     }
     this.isAfk = false;
+    this.stopAutoClicker();
     this.stopAntiAfk();
   }
 
@@ -293,12 +297,7 @@ class BotManager {
         this.updateState('in_survival', 'AFK Active');
       } else if (lower.includes('no longer afk') || lower.includes('not afk')) {
         this.isAfk = false;
-        this.log('warn', 'Server indicates AFK cancelled. Re-sending /afk in 2s...');
-        setTimeout(() => {
-          if (this.bot && this.inSurvival) {
-            this.sendAfk();
-          }
-        }, 2000);
+        this.log('system', 'Bot is active & not AFK (left-click spamming keeping it active).');
       }
     });
 
@@ -311,6 +310,7 @@ class BotManager {
     bot.on('death', () => {
       this.log('warn', 'Player died! Automatically respawning in 1.5 seconds...');
       this.isAfk = false;
+      this.stopAutoClicker();
       this.updateState('in_survival', 'Respawning...');
       setTimeout(() => {
         if (!this.bot) return;
@@ -323,8 +323,8 @@ class BotManager {
 
         setTimeout(() => {
           if (this.bot && this.inSurvival) {
-            this.log('system', 'Re-activating /afk after respawn...');
-            this.sendAfk();
+            this.log('system', 'Resuming auto-clicker after respawn...');
+            this.startAutoClicker();
           }
         }, 3500);
       }, 1500);
@@ -502,31 +502,62 @@ class BotManager {
       this.menuRetryInterval = null;
     }
 
-    this.log('system', 'Bot entered Survival server! Preparing /afk command...');
+    this.log('system', 'Bot entered Survival server! Preparing actions...');
     this.updateState('in_survival', 'Survival Mode Active');
 
     // Wait 3.5 seconds for chunks and player entity to settle
     setTimeout(() => {
-      if (!this.bot) return;
-      this.sendAfk();
+      if (!this.bot || !this.inSurvival) return;
 
-      // Backup check: If not confirmed AFK after 5 seconds, send /afk again
-      setTimeout(() => {
-        if (this.bot && this.inSurvival && !this.isAfk) {
-          this.log('system', 'AFK not yet confirmed, re-sending /afk backup...');
-          this.sendAfk();
+      // Execute custom post commands if any
+      if (Array.isArray(this.config.postCommands) && this.config.postCommands.length > 0) {
+        for (const cmd of this.config.postCommands) {
+          this.log('command', `Sending post-command: ${cmd}`);
+          this.bot.chat(cmd);
         }
-      }, 5000);
-    }, 3500);
-
-    // Periodic AFK maintenance: every 10 minutes, verify AFK status
-    if (this.afkCheckInterval) clearInterval(this.afkCheckInterval);
-    this.afkCheckInterval = setInterval(() => {
-      if (this.bot && this.inSurvival && !this.isAfk) {
-        this.log('system', 'Periodic check: Re-asserting /afk status...');
-        this.sendAfk();
       }
-    }, 10 * 60 * 1000);
+
+      this.startAutoClicker();
+    }, 3500);
+  }
+
+  startAutoClicker() {
+    this.stopAutoClicker();
+    if (this.config.autoClicker === false) return;
+
+    const intervalMs = parseInt(this.config.autoClickIntervalMs, 10) || 800;
+    this.log('system', `Auto-Clicker activated: Spamming left-click every ${intervalMs}ms (Anti-AFK & mob grinder).`);
+    this.updateState('in_survival', 'Auto-Clicking (Active)');
+
+    this.autoClickTimer = setInterval(() => {
+      this.performLeftClick();
+    }, intervalMs);
+  }
+
+  stopAutoClicker() {
+    if (this.autoClickTimer) {
+      clearInterval(this.autoClickTimer);
+      this.autoClickTimer = null;
+    }
+  }
+
+  performLeftClick() {
+    if (!this.bot || !this.inSurvival) return;
+
+    try {
+      // Find nearby mob or hostile entity within reach (<= 3.5 blocks) for mob farms
+      const filter = (e) => e && (e.type === 'mob' || e.type === 'hostile' || e.type === 'animal') && e !== this.bot.entity;
+      const target = this.bot.nearestEntity(e => filter(e) && this.bot.entity.position.distanceTo(e.position) <= 3.5);
+
+      if (target) {
+        this.bot.attack(target);
+      } else {
+        // Swing main hand (left-click animation packet)
+        this.bot.swingArm('right');
+      }
+    } catch (e) {
+      // Ignore minor swing errors
+    }
   }
 
   sendAfk() {

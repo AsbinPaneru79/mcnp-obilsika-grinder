@@ -33,8 +33,11 @@ const CONFIG = {
   guiTargetItem: (process.env.GUI_TARGET_ITEM || 'diamond_pickaxe').toLowerCase(),
   guiTargetSlot: process.env.GUI_TARGET_SLOT !== undefined ? parseInt(process.env.GUI_TARGET_SLOT, 10) : 11,
 
-  postCommands: ['/afk'],
+  postCommands: [],
   postCommandsDelayMs: 4000,
+
+  autoClicker: process.env.AUTO_CLICKER !== 'false',
+  autoClickIntervalMs: parseInt(process.env.AUTO_CLICK_INTERVAL_MS, 10) || 800,
 
   autoReconnect: process.env.AUTO_RECONNECT !== 'false',
   reconnectDelayMs: parseInt(process.env.RECONNECT_DELAY_MS, 10) || 8000,
@@ -64,6 +67,7 @@ let isReconnecting = false;
 let menuRetryInterval = null;
 let survivalTimer = null;
 let afkCheckInterval = null;
+let autoClickTimer = null;
 let isAfk = false;
 
 // State flags
@@ -115,6 +119,7 @@ function clearAllTimers() {
     clearInterval(afkCheckInterval);
     afkCheckInterval = null;
   }
+  stopAutoClicker();
   isAfk = false;
 }
 
@@ -203,13 +208,10 @@ function createBot() {
     // Check for AFK status confirmations and cancellations
     if (lower.includes('now afk') || lower.includes('you are now afk')) {
       isAfk = true;
-      console.log('[AFK] Confirmed: Bot is NOW AFK on the server!');
+      console.log('[AFK] Server indicates AFK active.');
     } else if (lower.includes('no longer afk') || lower.includes('not afk')) {
       isAfk = false;
-      console.log('[AFK] Server indicates AFK cancelled. Re-sending /afk in 2s...');
-      setTimeout(() => {
-        if (bot && inSurvival) sendAfk();
-      }, 2000);
+      console.log('[AFK] Bot is active & not AFK (left-click spamming keeping it active).');
     }
   });
 
@@ -258,6 +260,7 @@ function createBot() {
   bot.on('death', () => {
     console.log('[Bot] Player died! Automatically respawning in 1.5 seconds...');
     isAfk = false;
+    stopAutoClicker();
     setTimeout(() => {
       if (!bot) return;
       try {
@@ -267,11 +270,11 @@ function createBot() {
         console.warn('[Bot] Failed to send respawn packet:', err.message);
       }
 
-      // Re-enable /afk after respawn in Survival
+      // Resume auto-clicker after respawn in Survival
       setTimeout(() => {
         if (bot && inSurvival) {
-          console.log('[Bot] Re-activating /afk after respawn...');
-          sendAfk();
+          console.log('[Bot] Resuming auto-clicker after respawn...');
+          startAutoClicker();
         }
       }, 3500);
     }, 1500);
@@ -429,6 +432,40 @@ function sendAfk() {
   bot.chat('/afk');
 }
 
+function startAutoClicker() {
+  stopAutoClicker();
+  if (!CONFIG.autoClicker) return;
+
+  const intervalMs = CONFIG.autoClickIntervalMs || 800;
+  console.log(`[AutoClicker] Started spamming left-click every ${intervalMs}ms (Anti-AFK & mob grinder).`);
+  autoClickTimer = setInterval(() => {
+    performLeftClick();
+  }, intervalMs);
+}
+
+function stopAutoClicker() {
+  if (autoClickTimer) {
+    clearInterval(autoClickTimer);
+    autoClickTimer = null;
+  }
+}
+
+function performLeftClick() {
+  if (!bot || !inSurvival) return;
+  try {
+    const filter = (e) => e && (e.type === 'mob' || e.type === 'hostile' || e.type === 'animal') && e !== bot.entity;
+    const target = bot.nearestEntity(e => filter(e) && bot.entity.position.distanceTo(e.position) <= 3.5);
+
+    if (target) {
+      bot.attack(target);
+    } else {
+      bot.swingArm('right');
+    }
+  } catch (err) {
+    // Suppress minor swing errors
+  }
+}
+
 function scheduleSurvivalCommands() {
   if (inSurvival && postCommandsSent) return;
   inSurvival = true;
@@ -437,31 +474,22 @@ function scheduleSurvivalCommands() {
   clearAllTimers();
 
   console.log('\n======================================================');
-  console.log('[Bot] Arrived in Survival server! Scheduling /afk command...');
+  console.log('[Bot] Arrived in Survival server! Starting anti-AFK clicker...');
   console.log('======================================================');
 
   // Allow 3.5 seconds for world chunks and player position to fully settle
   setTimeout(() => {
-    if (!bot) return;
-    sendAfk();
+    if (!bot || !inSurvival) return;
 
-    // Backup check after 5 seconds: if not confirmed AFK, send /afk again
-    setTimeout(() => {
-      if (bot && inSurvival && !isAfk) {
-        console.log('[Bot] AFK not confirmed yet, sending /afk backup...');
-        sendAfk();
+    if (Array.isArray(CONFIG.postCommands) && CONFIG.postCommands.length > 0) {
+      for (const cmd of CONFIG.postCommands) {
+        console.log(`[Bot] Executing post-command: ${cmd}`);
+        bot.chat(cmd);
       }
-    }, 5000);
-  }, 3500);
-
-  // Periodic AFK guard: every 10 minutes, verify /afk
-  if (afkCheckInterval) clearInterval(afkCheckInterval);
-  afkCheckInterval = setInterval(() => {
-    if (bot && inSurvival && !isAfk) {
-      console.log('[Bot] Periodic check: Re-asserting /afk status...');
-      sendAfk();
     }
-  }, 10 * 60 * 1000);
+
+    startAutoClicker();
+  }, 3500);
 }
 
 function triggerReconnect() {
