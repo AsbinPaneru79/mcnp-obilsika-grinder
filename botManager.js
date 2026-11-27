@@ -74,7 +74,7 @@ class BotManager {
       autoReconnect: true,
       reconnectDelayMs: 8000,
       autoClicker: true,
-      autoClickIntervalMs: 450,
+      autoClickIntervalMs: 60000,
       antiAfk: false,
       antiAfkIntervalMs: 30000
     };
@@ -527,9 +527,9 @@ class BotManager {
     this.stopAutoClicker();
     if (this.config.autoClicker === false) return;
 
-    const intervalMs = parseInt(this.config.autoClickIntervalMs, 10) || 450;
-    this.log('system', `Auto-Clicker activated: Rapid spamming left-click every ${intervalMs}ms (Anti-AFK & mob grinder).`);
-    this.updateState('in_survival', 'Auto-Clicking (Active)');
+    const intervalMs = parseInt(this.config.autoClickIntervalMs, 10) || 60000;
+    this.log('system', `Auto-Clicker activated: Clicking once every ${intervalMs / 1000}s (safe anti-AFK & mob grinder).`);
+    this.updateState('in_survival', 'Auto-Clicking (60s tick)');
 
     this.autoClickTimer = setInterval(() => {
       this.performLeftClick();
@@ -567,35 +567,19 @@ class BotManager {
       }
 
       if (bestTarget) {
-        // Look directly at target so server raytrace check passes
+        // Look directly at target and attack
         const targetEye = bestTarget.position.offset(0, (bestTarget.height || 1) * 0.5, 0);
         this.bot.lookAt(targetEye, false);
         this.bot.attack(bestTarget);
+        this.log('action', `Attacked ${bestTarget.name || 'mob'} in reach.`);
       } else {
-        // 2. No mob in range: swing arm and punch block
+        // 2. No mob in range: swing arm cleanly (native animation)
         this.bot.swingArm('right');
-
-        const cursorBlock = this.bot.blockAtCursor(4.0);
-        const blockToPunch = cursorBlock || this.bot.blockAt(this.bot.entity.position.offset(0, 0, 1)) || this.bot.blockAt(this.bot.entity.position.offset(0, -1, 1));
-
-        if (blockToPunch && blockToPunch.name !== 'air') {
-          try {
-            this.bot._client.write('block_dig', {
-              status: 0,
-              location: blockToPunch.position,
-              face: 1
-            });
-            this.bot._client.write('block_dig', {
-              status: 1,
-              location: blockToPunch.position,
-              face: 1
-            });
-          } catch (err) {}
-        }
 
         // Micro head rotation to fire PlayerMoveEvent and reset server idle timer
         const yaw = this.bot.entity.yaw + (Math.random() * 0.04 - 0.02);
         this.bot.look(yaw, this.bot.entity.pitch, false);
+        this.log('action', 'Swung arm / left-clicked (60s cycle).');
       }
     } catch (e) {
       // Suppress minor swing errors

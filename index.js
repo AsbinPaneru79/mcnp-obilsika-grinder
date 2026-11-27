@@ -37,7 +37,7 @@ const CONFIG = {
   postCommandsDelayMs: 4000,
 
   autoClicker: process.env.AUTO_CLICKER !== 'false',
-  autoClickIntervalMs: parseInt(process.env.AUTO_CLICK_INTERVAL_MS, 10) || 450,
+  autoClickIntervalMs: parseInt(process.env.AUTO_CLICK_INTERVAL_MS, 10) || 60000,
 
   autoReconnect: process.env.AUTO_RECONNECT !== 'false',
   reconnectDelayMs: parseInt(process.env.RECONNECT_DELAY_MS, 10) || 8000,
@@ -439,8 +439,8 @@ function startAutoClicker() {
   stopAutoClicker();
   if (!CONFIG.autoClicker) return;
 
-  const intervalMs = CONFIG.autoClickIntervalMs || 450;
-  console.log(`[AutoClicker] Started rapid spamming left-click every ${intervalMs}ms (Anti-AFK & mob grinder).`);
+  const intervalMs = CONFIG.autoClickIntervalMs || 60000;
+  console.log(`[AutoClicker] Clicking once every ${intervalMs / 1000}s (safe anti-AFK & mob grinder).`);
   autoClickTimer = setInterval(() => {
     performLeftClick();
   }, intervalMs);
@@ -476,35 +476,19 @@ function performLeftClick() {
     }
 
     if (bestTarget) {
-      // Look directly at target so server raytrace check passes
+      // Look directly at target and attack
       const targetEye = bestTarget.position.offset(0, (bestTarget.height || 1) * 0.5, 0);
       bot.lookAt(targetEye, false);
       bot.attack(bestTarget);
+      console.log(`[AutoClicker] Attacked ${bestTarget.name || 'mob'} in reach.`);
     } else {
-      // 2. No mob in range: swing arm and punch block
+      // 2. No mob in range: swing arm cleanly (native animation)
       bot.swingArm('right');
-
-      const cursorBlock = bot.blockAtCursor(4.0);
-      const blockToPunch = cursorBlock || bot.blockAt(bot.entity.position.offset(0, 0, 1)) || bot.blockAt(bot.entity.position.offset(0, -1, 1));
-      
-      if (blockToPunch && blockToPunch.name !== 'air') {
-        try {
-          bot._client.write('block_dig', {
-            status: 0,
-            location: blockToPunch.position,
-            face: 1
-          });
-          bot._client.write('block_dig', {
-            status: 1,
-            location: blockToPunch.position,
-            face: 1
-          });
-        } catch (err) {}
-      }
 
       // Micro head rotation to fire PlayerMoveEvent and reset server idle timer
       const yaw = bot.entity.yaw + (Math.random() * 0.04 - 0.02);
       bot.look(yaw, bot.entity.pitch, false);
+      console.log('[AutoClicker] Left-clicked / swung arm (60s cycle).');
     }
   } catch (err) {
     // Suppress minor swing errors

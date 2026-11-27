@@ -14,7 +14,7 @@ Built with [Mineflayer](https://github.com/PrismarineJS/mineflayer), Express, an
 4. **Right Click:** Right-clicks (activates) the held navigation item to pop open the Game Modes GUI.
 5. **GUI Selection:** Identifies and clicks the **Blue Diamond Pickaxe** (Slot 11) in the 27-slot chest menu to transfer directly to the **Survival** realm.
 6. **Left-Click Auto-Clicker (Anti-AFK & Mob Grinder):** Once transferred to Survival:
-   - Continuously spams left-clicks (swings arm and attacks nearby mobs within 3.5 blocks) every 800ms.
+   - Automatically left-clicks (swings arm and attacks nearby mobs within reach) once every 60 seconds.
    - Keeps the player 100% active (prevents AFK idle timeouts) while automatically killing mobs in your AFK farm.
 7. **Auto-Respawn on Death:** If killed by mobs or environment, automatically respawns after 1.5s and resumes grinding.
 8. **Auto-Reconnect:** If kicked, disconnected, or faced with network drops, automatically rejoins after 8 seconds and repeats the full sequence seamlessly.

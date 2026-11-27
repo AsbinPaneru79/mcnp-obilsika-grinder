@@ -18,7 +18,7 @@
   "autoReconnect": true,
   "reconnectDelayMs": 8000,
   "autoClicker": true,
-  "autoClickIntervalMs": 450,
+  "autoClickIntervalMs": 60000,
   "antiAfk": false,
   "antiAfkIntervalMs": 30000
 }
