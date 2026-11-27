@@ -3,6 +3,21 @@ const mineflayer = require('mineflayer');
 const fs = require('fs');
 const path = require('path');
 
+function normalizeMinecraftText(text) {
+  if (!text) return '';
+  const smallCaps = {
+    'ᴀ': 'a', 'ʙ': 'b', 'ᴄ': 'c', 'ᴅ': 'd', 'ᴇ': 'e', 'ꜰ': 'f', 'ɢ': 'g',
+    'ʜ': 'h', 'ɪ': 'i', 'ᴊ': 'j', 'ᴋ': 'k', 'ʟ': 'l', 'ᴍ': 'm', 'ɴ': 'n',
+    'ᴏ': 'o', 'ᴘ': 'p', 'ǫ': 'q', 'ʀ': 'r', 'ꜱ': 's', 'ᴛ': 't', 'ᴜ': 'u',
+    'ᴠ': 'v', 'ᴡ': 'w', 'x': 'x', 'ʏ': 'y', 'ᴢ': 'z'
+  };
+  return text
+    .split('')
+    .map(c => smallCaps[c] || c)
+    .join('')
+    .toLowerCase();
+}
+
 class BotManager {
   constructor(configPath, onEvent) {
     this.configPath = configPath;
@@ -41,7 +56,7 @@ class BotManager {
     return {
       host: 'mcnp.network',
       port: 25565,
-      username: '_ObilSika_',
+      username: 'KrishhnaKazi',
       auth: 'offline',
       version: false,
       password: 'tynorix',
@@ -235,17 +250,21 @@ class BotManager {
       if (this.chatHistory.length > 300) this.chatHistory.shift();
       this.onEvent('chat', chatEntry);
 
-      const lower = plainText.toLowerCase();
+      const lower = normalizeMinecraftText(plainText);
 
-      // Check for /register prompt
-      if ((lower.includes('/register') || lower.includes('please register') || lower.includes('type /register')) && !this.loginSent) {
-        this.log('system', 'Server requested /register. Executing...');
-        this.executeRegisterCommand();
+      // Check for /register prompt or 'not registered' error
+      if (lower.includes('/register') || lower.includes('please register') || lower.includes('type /register') || lower.includes('not registered') || lower.includes('need to register')) {
+        if (!this.loginSent || lower.includes('not registered')) {
+          this.log('system', 'Server requested /register. Executing...');
+          this.executeRegisterCommand(true);
+        }
       }
-      // Check for /login prompt
-      else if ((lower.includes('/login') || lower.includes('please login') || lower.includes('type /login')) && !this.loginSent) {
-        this.log('system', 'Server requested /login. Executing...');
-        this.executeLoginCommand();
+      // Check for /login prompt or 'already registered' message
+      else if (lower.includes('/login') || lower.includes('please login') || lower.includes('type /login') || lower.includes('already registered')) {
+        if (!this.loginSent || lower.includes('already registered')) {
+          this.log('system', 'Server requested /login. Executing...');
+          this.executeLoginCommand(true);
+        }
       }
 
       // Check for login / register success
@@ -288,6 +307,29 @@ class BotManager {
       this.handleWindowOpen(window);
     });
 
+    // Auto-respawn on death
+    bot.on('death', () => {
+      this.log('warn', 'Player died! Automatically respawning in 1.5 seconds...');
+      this.isAfk = false;
+      this.updateState('in_survival', 'Respawning...');
+      setTimeout(() => {
+        if (!this.bot) return;
+        try {
+          this.bot.respawn();
+          this.log('system', 'Respawn packet sent.');
+        } catch (err) {
+          this.log('error', `Respawn failed: ${err.message}`);
+        }
+
+        setTimeout(() => {
+          if (this.bot && this.inSurvival) {
+            this.log('system', 'Re-activating /afk after respawn...');
+            this.sendAfk();
+          }
+        }, 3500);
+      }, 1500);
+    });
+
     bot.on('kicked', (reason) => {
       let kickReason = '';
       try {
@@ -317,16 +359,16 @@ class BotManager {
     });
   }
 
-  executeRegisterCommand() {
-    if (!this.bot || this.loginSent) return;
+  executeRegisterCommand(force = false) {
+    if (!this.bot || (this.loginSent && !force)) return;
     const pwd = this.config.password || 'tynorix';
     this.log('command', `Sending: /register ${pwd} ${pwd}`);
     this.bot.chat(`/register ${pwd} ${pwd}`);
     this.loginSent = true;
   }
 
-  executeLoginCommand() {
-    if (!this.bot || this.loginSent) return;
+  executeLoginCommand(force = false) {
+    if (!this.bot || (this.loginSent && !force)) return;
     const pwd = this.config.password || 'tynorix';
     this.log('command', `Sending: /login ${pwd}`);
     this.bot.chat(`/login ${pwd}`);

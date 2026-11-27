@@ -1,6 +1,6 @@
 # MCNP ObilSika Grinder ⛏️
 
-An automated 24/7 Minecraft AFK bot tailored for player **`_ObilSika_`** on the **`mcnp.network`** server.
+An automated 24/7 Minecraft AFK bot tailored for player **`KrishhnaKazi`** on the **`mcnp.network`** server.
 
 Built with [Mineflayer](https://github.com/PrismarineJS/mineflayer), Express, and Socket.IO, this bot automatically handles registration/login authentication, hotbar selection, GUI navigation to Survival mode, AFK status, and auto-reconnection.
 
@@ -8,7 +8,7 @@ Built with [Mineflayer](https://github.com/PrismarineJS/mineflayer), Express, an
 
 ## ⚡ What It Does (Step-by-Step)
 
-1. **Joins Server:** Connects to `mcnp.network:25565` using offline auth with username **`_ObilSika_`**.
+1. **Joins Server:** Connects to `mcnp.network:25565` using offline auth with username **`KrishhnaKazi`**.
 2. **Auto-Register & Auto-Login:** Automatically detects if the server requires `/register tynorix tynorix` or `/login tynorix` upon detecting the prompt (with automatic timer fallback).
 3. **Hotbar Selection:** Moves to the **2nd hotbar slot** (quickbar index 1).
 4. **Right Click:** Right-clicks (activates) the held navigation item to pop open the Game Modes GUI.

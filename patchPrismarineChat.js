@@ -24,8 +24,24 @@ try {
               contentText = typeof params.content === 'object'
                 ? (params.content.text || params.content.translate || JSON.stringify(params.content))
                 : String(params.content);
+            } else if (params.text) {
+              contentText = params.text;
             } else if (params.sender || params.target) {
               contentText = String(params.sender || params.target);
+            } else if (typeof params === 'object') {
+              try {
+                contentText = JSON.stringify(params);
+              } catch (e) {
+                contentText = String(params);
+              }
+            } else {
+              contentText = String(params);
+            }
+          } else if (type && typeof type === 'object') {
+            try {
+              contentText = type.text || JSON.stringify(type);
+            } catch (e) {
+              contentText = String(type);
             }
           }
           return new ChatMessage({ text: contentText });

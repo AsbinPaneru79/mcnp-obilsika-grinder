@@ -25,7 +25,7 @@ const mineflayer = require('mineflayer');
 const CONFIG = {
   host: process.env.MC_HOST || 'mcnp.network',
   port: parseInt(process.env.MC_PORT, 10) || 25565,
-  username: process.env.MC_USERNAME || '_ObilSika_',
+  username: process.env.MC_USERNAME || 'KrishhnaKazi',
   loginPassword: process.env.MC_PASSWORD || 'tynorix',
   version: process.env.MC_VERSION || false, // false auto-detects version
 
@@ -43,6 +43,21 @@ const CONFIG = {
 };
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function normalizeMinecraftText(text) {
+  if (!text) return '';
+  const smallCaps = {
+    'ᴀ': 'a', 'ʙ': 'b', 'ᴄ': 'c', 'ᴅ': 'd', 'ᴇ': 'e', 'ꜰ': 'f', 'ɢ': 'g',
+    'ʜ': 'h', 'ɪ': 'i', 'ᴊ': 'j', 'ᴋ': 'k', 'ʟ': 'l', 'ᴍ': 'm', 'ɴ': 'n',
+    'ᴏ': 'o', 'ᴘ': 'p', 'ǫ': 'q', 'ʀ': 'r', 'ꜱ': 's', 'ᴛ': 't', 'ᴜ': 'u',
+    'ᴠ': 'v', 'ᴡ': 'w', 'x': 'x', 'ʏ': 'y', 'ᴢ': 'z'
+  };
+  return text
+    .split('')
+    .map(c => smallCaps[c] || c)
+    .join('')
+    .toLowerCase();
+}
 
 let bot = null;
 let isReconnecting = false;
@@ -150,17 +165,21 @@ function createBot() {
       console.log(`[Chat] ${raw}`);
     }
 
-    const lower = raw.toLowerCase();
+    const lower = normalizeMinecraftText(raw);
 
-    // Check for register prompt
-    if ((lower.includes('/register') || lower.includes('please register') || lower.includes('type /register')) && !hasLoggedIn) {
-      console.log(`[Auth] Register prompt detected in chat! Executing register...`);
-      executeRegisterCommand();
+    // Check for register prompt or 'not registered' error
+    if (lower.includes('/register') || lower.includes('please register') || lower.includes('type /register') || lower.includes('not registered') || lower.includes('need to register')) {
+      if (!hasLoggedIn || lower.includes('not registered')) {
+        console.log(`[Auth] Register prompt detected in chat! Executing /register...`);
+        executeRegisterCommand(true);
+      }
     }
-    // Check for login prompt
-    else if ((lower.includes('/login') || lower.includes('please login') || lower.includes('type /login')) && !hasLoggedIn) {
-      console.log(`[Auth] Login prompt detected in chat! Executing login...`);
-      executeLoginCommand();
+    // Check for login prompt or 'already registered' message
+    else if (lower.includes('/login') || lower.includes('please login') || lower.includes('type /login') || lower.includes('already registered')) {
+      if (!hasLoggedIn || lower.includes('already registered')) {
+        console.log(`[Auth] Login prompt detected in chat! Executing /login...`);
+        executeLoginCommand(true);
+      }
     }
 
     // Check for auth success
@@ -233,6 +252,29 @@ function createBot() {
         }
       }, 2500);
     }
+  });
+
+  // Auto-respawn on death
+  bot.on('death', () => {
+    console.log('[Bot] Player died! Automatically respawning in 1.5 seconds...');
+    isAfk = false;
+    setTimeout(() => {
+      if (!bot) return;
+      try {
+        bot.respawn();
+        console.log('[Bot] Respawn packet sent successfully.');
+      } catch (err) {
+        console.warn('[Bot] Failed to send respawn packet:', err.message);
+      }
+
+      // Re-enable /afk after respawn in Survival
+      setTimeout(() => {
+        if (bot && inSurvival) {
+          console.log('[Bot] Re-activating /afk after respawn...');
+          sendAfk();
+        }
+      }, 3500);
+    }, 1500);
   });
 
   // Chest GUI Handler (Matches the 27-slot GAMEMODES selector)
@@ -320,15 +362,15 @@ function createBot() {
 }
 
 // 3. Helper Functions
-function executeRegisterCommand() {
-  if (!bot || hasLoggedIn) return;
+function executeRegisterCommand(force = false) {
+  if (!bot || (hasLoggedIn && !force)) return;
   console.log(`[Auth] Sending: /register ${CONFIG.loginPassword} ${CONFIG.loginPassword}`);
   bot.chat(`/register ${CONFIG.loginPassword} ${CONFIG.loginPassword}`);
   hasLoggedIn = true;
 }
 
-function executeLoginCommand() {
-  if (!bot || hasLoggedIn) return;
+function executeLoginCommand(force = false) {
+  if (!bot || (hasLoggedIn && !force)) return;
   console.log(`[Auth] Sending: /login ${CONFIG.loginPassword}`);
   bot.chat(`/login ${CONFIG.loginPassword}`);
   hasLoggedIn = true;
