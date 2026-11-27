@@ -37,7 +37,7 @@ const CONFIG = {
   postCommandsDelayMs: 4000,
 
   autoClicker: process.env.AUTO_CLICKER !== 'false',
-  autoClickIntervalMs: parseInt(process.env.AUTO_CLICK_INTERVAL_MS, 10) || 800,
+  autoClickIntervalMs: parseInt(process.env.AUTO_CLICK_INTERVAL_MS, 10) || 450,
 
   autoReconnect: process.env.AUTO_RECONNECT !== 'false',
   reconnectDelayMs: parseInt(process.env.RECONNECT_DELAY_MS, 10) || 8000,
@@ -197,21 +197,24 @@ function createBot() {
       }, 2000);
     }
 
-    // Detect Survival chat announcement to trigger /afk
-    if (hasClickedGui && !inSurvival) {
-      if (lower.includes('dailyquests') || lower.includes('vote for us') || lower.includes(CONFIG.username.toLowerCase())) {
-        console.log('[Bot] Survival arrival detected in chat! Triggering /afk routine...');
-        scheduleSurvivalCommands();
-      }
+    // Detect Survival chat announcement to trigger auto-clicker
+    if (!inSurvival && (lower.includes('dailyquests') || lower.includes('vote for us') || (hasClickedGui && lower.includes(CONFIG.username.toLowerCase())))) {
+      console.log('[Bot] Survival arrival detected in chat! Triggering auto-clicker...');
+      scheduleSurvivalCommands();
     }
 
     // Check for AFK status confirmations and cancellations
     if (lower.includes('now afk') || lower.includes('you are now afk')) {
       isAfk = true;
-      console.log('[AFK] Server indicates AFK active.');
+      console.log('[Anti-AFK] Server placed bot in AFK! Toggling /afk off & jumping to break AFK...');
+      bot.chat('/afk');
+      try {
+        bot.setControlState('jump', true);
+        setTimeout(() => { if (bot) bot.setControlState('jump', false); }, 300);
+      } catch (e) {}
     } else if (lower.includes('no longer afk') || lower.includes('not afk')) {
       isAfk = false;
-      console.log('[AFK] Bot is active & not AFK (left-click spamming keeping it active).');
+      console.log('[AFK] Confirmed: Bot is active and NOT AFK.');
     }
   });
 
@@ -436,8 +439,8 @@ function startAutoClicker() {
   stopAutoClicker();
   if (!CONFIG.autoClicker) return;
 
-  const intervalMs = CONFIG.autoClickIntervalMs || 800;
-  console.log(`[AutoClicker] Started spamming left-click every ${intervalMs}ms (Anti-AFK & mob grinder).`);
+  const intervalMs = CONFIG.autoClickIntervalMs || 450;
+  console.log(`[AutoClicker] Started rapid spamming left-click every ${intervalMs}ms (Anti-AFK & mob grinder).`);
   autoClickTimer = setInterval(() => {
     performLeftClick();
   }, intervalMs);
@@ -451,15 +454,57 @@ function stopAutoClicker() {
 }
 
 function performLeftClick() {
-  if (!bot || !inSurvival) return;
+  if (!bot || !bot.entity || !inSurvival) return;
   try {
-    const filter = (e) => e && (e.type === 'mob' || e.type === 'hostile' || e.type === 'animal') && e !== bot.entity;
-    const target = bot.nearestEntity(e => filter(e) && bot.entity.position.distanceTo(e.position) <= 3.5);
+    const botEye = bot.entity.position.offset(0, 1.62, 0);
 
-    if (target) {
-      bot.attack(target);
+    // 1. Search for any nearby mob/hostile/animal to attack (radius up to 4.2 blocks)
+    let bestTarget = null;
+    let minDistance = 4.2;
+
+    for (const id in bot.entities) {
+      const e = bot.entities[id];
+      if (!e || e === bot.entity) continue;
+      if (e.type === 'player' || e.name === 'armor_stand' || e.name === 'item' || e.type === 'projectile') continue;
+      
+      const targetPos = e.position.offset(0, (e.height || 1) * 0.5, 0);
+      const dist = botEye.distanceTo(targetPos);
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestTarget = e;
+      }
+    }
+
+    if (bestTarget) {
+      // Look directly at target so server raytrace check passes
+      const targetEye = bestTarget.position.offset(0, (bestTarget.height || 1) * 0.5, 0);
+      bot.lookAt(targetEye, false);
+      bot.attack(bestTarget);
     } else {
+      // 2. No mob in range: swing arm and punch block
       bot.swingArm('right');
+
+      const cursorBlock = bot.blockAtCursor(4.0);
+      const blockToPunch = cursorBlock || bot.blockAt(bot.entity.position.offset(0, 0, 1)) || bot.blockAt(bot.entity.position.offset(0, -1, 1));
+      
+      if (blockToPunch && blockToPunch.name !== 'air') {
+        try {
+          bot._client.write('block_dig', {
+            status: 0,
+            location: blockToPunch.position,
+            face: 1
+          });
+          bot._client.write('block_dig', {
+            status: 1,
+            location: blockToPunch.position,
+            face: 1
+          });
+        } catch (err) {}
+      }
+
+      // Micro head rotation to fire PlayerMoveEvent and reset server idle timer
+      const yaw = bot.entity.yaw + (Math.random() * 0.04 - 0.02);
+      bot.look(yaw, bot.entity.pitch, false);
     }
   } catch (err) {
     // Suppress minor swing errors
@@ -477,7 +522,7 @@ function scheduleSurvivalCommands() {
   console.log('[Bot] Arrived in Survival server! Starting anti-AFK clicker...');
   console.log('======================================================');
 
-  // Allow 3.5 seconds for world chunks and player position to fully settle
+  // Allow 1.5 seconds for world chunks and player position to settle
   setTimeout(() => {
     if (!bot || !inSurvival) return;
 
@@ -489,7 +534,7 @@ function scheduleSurvivalCommands() {
     }
 
     startAutoClicker();
-  }, 3500);
+  }, 1500);
 }
 
 function triggerReconnect() {

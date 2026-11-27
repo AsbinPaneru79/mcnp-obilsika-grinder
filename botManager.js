@@ -74,7 +74,7 @@ class BotManager {
       autoReconnect: true,
       reconnectDelayMs: 8000,
       autoClicker: true,
-      autoClickIntervalMs: 800,
+      autoClickIntervalMs: 450,
       antiAfk: false,
       antiAfkIntervalMs: 30000
     };
@@ -282,22 +282,24 @@ class BotManager {
         }, 2500);
       }
 
-      // Detect Survival join announcements to guarantee /afk is sent
-      if (this.hasClickedGui && !this.inSurvival) {
-        if (lower.includes('dailyquests') || lower.includes('vote for us') || lower.includes(this.config.username.toLowerCase())) {
-          this.log('system', 'Survival arrival confirmed via chat. Triggering /afk...');
-          this.scheduleSurvivalCommands();
-        }
+      // Detect Survival join announcements to trigger auto-clicker
+      if (!this.inSurvival && (lower.includes('dailyquests') || lower.includes('vote for us') || (this.hasClickedGui && lower.includes(this.config.username.toLowerCase())))) {
+        this.log('system', 'Survival arrival confirmed via chat. Starting auto-clicker...');
+        this.scheduleSurvivalCommands();
       }
 
       // Detect AFK state confirmations and cancellations
       if (lower.includes('now afk') || lower.includes('you are now afk')) {
         this.isAfk = true;
-        this.log('system', 'AFK mode confirmed active: ' + plainText);
-        this.updateState('in_survival', 'AFK Active');
+        this.log('warn', 'Server placed bot in AFK! Toggling /afk off & jumping to break AFK...');
+        this.sendAfk();
+        try {
+          this.bot.setControlState('jump', true);
+          setTimeout(() => { if (this.bot) this.bot.setControlState('jump', false); }, 300);
+        } catch (e) {}
       } else if (lower.includes('no longer afk') || lower.includes('not afk')) {
         this.isAfk = false;
-        this.log('system', 'Bot is active & not AFK (left-click spamming keeping it active).');
+        this.log('system', 'Confirmed: Bot is active and NOT AFK.');
       }
     });
 
@@ -505,7 +507,7 @@ class BotManager {
     this.log('system', 'Bot entered Survival server! Preparing actions...');
     this.updateState('in_survival', 'Survival Mode Active');
 
-    // Wait 3.5 seconds for chunks and player entity to settle
+    // Wait 1.5 seconds for chunks and player entity to settle
     setTimeout(() => {
       if (!this.bot || !this.inSurvival) return;
 
@@ -518,15 +520,15 @@ class BotManager {
       }
 
       this.startAutoClicker();
-    }, 3500);
+    }, 1500);
   }
 
   startAutoClicker() {
     this.stopAutoClicker();
     if (this.config.autoClicker === false) return;
 
-    const intervalMs = parseInt(this.config.autoClickIntervalMs, 10) || 800;
-    this.log('system', `Auto-Clicker activated: Spamming left-click every ${intervalMs}ms (Anti-AFK & mob grinder).`);
+    const intervalMs = parseInt(this.config.autoClickIntervalMs, 10) || 450;
+    this.log('system', `Auto-Clicker activated: Rapid spamming left-click every ${intervalMs}ms (Anti-AFK & mob grinder).`);
     this.updateState('in_survival', 'Auto-Clicking (Active)');
 
     this.autoClickTimer = setInterval(() => {
@@ -542,21 +544,61 @@ class BotManager {
   }
 
   performLeftClick() {
-    if (!this.bot || !this.inSurvival) return;
+    if (!this.bot || !this.bot.entity || !this.inSurvival) return;
 
     try {
-      // Find nearby mob or hostile entity within reach (<= 3.5 blocks) for mob farms
-      const filter = (e) => e && (e.type === 'mob' || e.type === 'hostile' || e.type === 'animal') && e !== this.bot.entity;
-      const target = this.bot.nearestEntity(e => filter(e) && this.bot.entity.position.distanceTo(e.position) <= 3.5);
+      const botEye = this.bot.entity.position.offset(0, 1.62, 0);
 
-      if (target) {
-        this.bot.attack(target);
+      // 1. Search for any nearby mob/hostile/animal to attack (radius up to 4.2 blocks)
+      let bestTarget = null;
+      let minDistance = 4.2;
+
+      for (const id in this.bot.entities) {
+        const e = this.bot.entities[id];
+        if (!e || e === this.bot.entity) continue;
+        if (e.type === 'player' || e.name === 'armor_stand' || e.name === 'item' || e.type === 'projectile') continue;
+
+        const targetPos = e.position.offset(0, (e.height || 1) * 0.5, 0);
+        const dist = botEye.distanceTo(targetPos);
+        if (dist < minDistance) {
+          minDistance = dist;
+          bestTarget = e;
+        }
+      }
+
+      if (bestTarget) {
+        // Look directly at target so server raytrace check passes
+        const targetEye = bestTarget.position.offset(0, (bestTarget.height || 1) * 0.5, 0);
+        this.bot.lookAt(targetEye, false);
+        this.bot.attack(bestTarget);
       } else {
-        // Swing main hand (left-click animation packet)
+        // 2. No mob in range: swing arm and punch block
         this.bot.swingArm('right');
+
+        const cursorBlock = this.bot.blockAtCursor(4.0);
+        const blockToPunch = cursorBlock || this.bot.blockAt(this.bot.entity.position.offset(0, 0, 1)) || this.bot.blockAt(this.bot.entity.position.offset(0, -1, 1));
+
+        if (blockToPunch && blockToPunch.name !== 'air') {
+          try {
+            this.bot._client.write('block_dig', {
+              status: 0,
+              location: blockToPunch.position,
+              face: 1
+            });
+            this.bot._client.write('block_dig', {
+              status: 1,
+              location: blockToPunch.position,
+              face: 1
+            });
+          } catch (err) {}
+        }
+
+        // Micro head rotation to fire PlayerMoveEvent and reset server idle timer
+        const yaw = this.bot.entity.yaw + (Math.random() * 0.04 - 0.02);
+        this.bot.look(yaw, this.bot.entity.pitch, false);
       }
     } catch (e) {
-      // Ignore minor swing errors
+      // Suppress minor swing errors
     }
   }
 
